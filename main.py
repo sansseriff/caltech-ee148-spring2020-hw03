@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import PIL
+import pickle
 
 random.seed(2020)
 torch.manual_seed(2020)
@@ -288,6 +289,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
                 100. * batch_idx / len(train_loader), loss.item()))
 
         total_loss = total_loss + loss.item()
+    #train loss for each epoch is an average of the loss over all mini-batches
     train_loss = total_loss/batch_idx
 
     return train_loss
@@ -360,7 +362,7 @@ def main():
         assert os.path.exists(args.load_model)
 
         # Set the test model
-        model = fcNet().to(device)
+        model = Net().to(device)
         model.load_state_dict(torch.load(args.load_model))
 
         test_dataset = datasets.MNIST('../data', train=False,
@@ -436,17 +438,26 @@ def main():
     subset_indices_valid = [j for sub in val_idx for j in sub]
 
 
+    # for adjusting size of train set
+
+    train_length = int(len(subset_indices_train))
+    #train_length = int(len(subset_indices_train)/2)
+    #train_length = int(len(subset_indices_train) / 4)
+    #train_length = int(len(subset_indices_train) / 8)
+    #train_length = int(len(subset_indices_train) / 16)
+
+
+
 
     # You can assign indices for training/validation or use a random subset for
     # training by using SubsetRandomSampler. Right now the train and validation
     # sets are built from the same indices - this is bad! Change it so that
     # the training and validation sets are disjoint and have the correct relative sizes.
-    #subset_indices_train = range(len(train_dataset))
-    #subset_indices_valid = range(len(train_dataset))
+
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset_augmented, batch_size=args.batch_size,
-        sampler=SubsetRandomSampler(subset_indices_train)
+        sampler=SubsetRandomSampler(subset_indices_train[:train_length])
     )
     val_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.test_batch_size,
@@ -486,11 +497,18 @@ def main():
 
             # You may optionally save your model at each epoch here
 
-
-
-
         if args.save_model:
-            torch.save(model.state_dict(), "mnist_model.pt")
+
+            print(train_losses)
+            with open("train_losses_one.txt", "wb") as fp:  # Pickling
+                pickle.dump(train_losses, fp)
+            print(test_losses)
+            with open("test_losses_one.txt", "wb") as fp:  # Pickling
+                pickle.dump(test_losses, fp)
+
+
+
+            torch.save(model.state_dict(), "mnist_model_one.pt")
 
 
 if __name__ == '__main__':

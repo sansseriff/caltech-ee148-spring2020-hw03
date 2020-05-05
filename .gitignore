@@ -3,6 +3,32 @@ main_alternate.py
 
 mnist_model_old.pt
 mnist_model.pt
+
+mnist_model_half.pt
+mnist_model_quarter.pt
+mnist_model_eighth.pt
+mnist_model_sixteenth.pt
+
+
+test_losses_one.txt
+test_losses_half.txt
+test_losses_quarter.txt
+test_losses_eighth.txt
+test_losses_sixteenth.txt
+
+train_losses_one.txt
+train_losses_half.txt
+train_losses_quarter.txt
+train_losses_eighth.txt
+train_losses_sixteenth.txt
+
+mnist_model_one.pt
+mnist_model_half.pt
+mnist_model_quarter.pt
+mnist_model_eighth.pt
+mnist_model_sixteenth.pt
+
+
 =======
 main_alternate.py
 >>>>>>> da2e669... intial test commit
