@@ -17,9 +17,12 @@ import pickle
 
 import sklearn
 from sklearn.metrics import confusion_matrix
+from sklearn.manifold import TSNE
 import seaborn as sn
 import pandas as pd
 from math import log
+import math
+
 
 random.seed(2020)
 torch.manual_seed(2020)
@@ -311,8 +314,10 @@ def test(model, device, test_loader, evaluate = False):
     test_num = 0
 
     images = []
+    allimages = []
     master_preds = []
     master_truths = []
+    master_hidden_layers = []
     with torch.no_grad():   # For the inference step, gradient is not computed
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
@@ -323,26 +328,9 @@ def test(model, device, test_loader, evaluate = False):
             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
 
-
-            #print(len(feature_vector))
-            #print(type(feature_vector))
-
-
-            #print("data:", type(data[0]))
-            #print(type(data[0][0][0]))
-
-            #print(data[0].size())
-            #print(data[0][0].size())
-            #print(type(data[0][0].data))
-
-            #a = data[0][0].cpu()
-            #b = a.numpy()
-            #print(type(b))
-            #print(np.shape(b))
-
-            #fig = plt.figure()
-            #plt.imshow(img[0][0].numpy(), cmap='gray')
-            #np.shape(data[0][0].numpy())
+            print(len(hidden_layer))
+            print(len(hidden_layer[0]))
+            #print(hidden_layer[0])
 
 
             correct += pred.eq(target.view_as(pred)).sum().item()
@@ -353,7 +341,10 @@ def test(model, device, test_loader, evaluate = False):
                 for i in range(len(pred)):
                     master_preds.append(pred[i][0].item())
                     master_truths.append(target[i].item())
-
+                    layer = hidden_layer[i].cpu()
+                    master_hidden_layers.append(layer.numpy())
+                    image = data[i][0].cpu()
+                    allimages.append(image.numpy())
                     if pred[i][0] == target[i]:
                         continue
                     else:
@@ -364,9 +355,58 @@ def test(model, device, test_loader, evaluate = False):
 
         if evaluate:
 
+            #print(len(master_hidden_layers))
+            #print(master_hidden_layers[0])
 
-            #preds = [pred[i][0].item() for i in range(len(images))]
-            #truths = [target[i].item() for i in range(len(images))]
+            distances = np.zeros(len(master_hidden_layers))
+
+            #x0 = master_hidden_layers[0]
+
+            for i in range(len(distances)):
+                length = 0
+                for dim in range(len(master_hidden_layers[0])):
+                    length = length + (master_hidden_layers[i][dim] - master_hidden_layers[15][dim])**2
+                length = math.sqrt(length)
+                distances[i] = length
+
+            sorted_distance_index = np.argsort(distances)
+
+            figa = plt.figure()
+
+
+            print("test")
+            for i in range(9):
+                sub = figa.add_subplot(9, 1, i + 1)
+                sub.imshow(allimages[sorted_distance_index[i]], interpolation='nearest', cmap='gray')
+
+                #title = "Predicted: " + str(images[i + 10][1]) + " True: " + str(images[i + 10][2])
+                #sub.set_title(title)
+
+
+
+            X = master_hidden_layers
+            y = np.array(master_truths)
+            tsne = TSNE(n_components=2, random_state=0)
+            X_2d = np.array(tsne.fit_transform(X))
+
+            target_ids = range(10)
+
+            cdict = {0: 'orange', 1: 'red', 2: 'blue', 3: 'green', 4: 'salmon', 5:'c', 6: 'm', 7: 'y', 8: 'k', 9: 'lime'}
+
+            fig, ax = plt.subplots()
+            for g in np.unique(y):
+                ix = np.where(y == g)
+                ax.scatter(X_2d[ix, 0], X_2d[ix, 1], c=cdict[g], label=g, s=5)
+            ax.legend()
+            plt.show()
+
+
+            #i = 1
+            #plt.figure(figsize=(6, 5))
+            #plt.scatter(X_2d[10*i:10*i+10,0],X_2d[:10,1])
+
+
+
             CM = confusion_matrix(master_truths,master_preds)
             CMex = CM
             #for i in range(len(CM)):
