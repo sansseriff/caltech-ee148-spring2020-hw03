@@ -14,6 +14,13 @@ import random
 import PIL
 import pickle
 
+
+import sklearn
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
+import pandas as pd
+from math import log
+
 random.seed(2020)
 torch.manual_seed(2020)
 
@@ -184,11 +191,11 @@ class Net(nn.Module):
         x = self.fc2(x)
         x = F.relu(x)
 
-        x = self.fc3(x)
+        xf = self.fc3(x)
 
 
-        output = F.log_softmax(x, dim=1)
-        return output
+        output = F.log_softmax(xf, dim=1)
+        return output, x
 
 
 class Net2(nn.Module):
@@ -263,11 +270,13 @@ class Net2(nn.Module):
         x = self.fc2(x)
         x = F.relu(x)
 
-        x = self.fc3(x)
 
 
-        output = F.log_softmax(x, dim=1)
-        return output
+        xf = self.fc3(x)
+
+
+        output = F.log_softmax(xf, dim=1)
+        return output, x
 
 def train(args, model, device, train_loader, optimizer, epoch):
     '''
@@ -279,7 +288,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()               # Clear the gradient
-        output = model(data)                # Make predictions
+        output, hidden_layer = model(data)                # Make predictions
         loss = F.nll_loss(output, target)   # Compute loss
         loss.backward()                     # Gradient computation
         optimizer.step()                    # Perform a single optimization step
@@ -295,19 +304,128 @@ def train(args, model, device, train_loader, optimizer, epoch):
     return train_loss
 
 
-def test(model, device, test_loader):
+def test(model, device, test_loader, evaluate = False):
     model.eval()    # Set the model to inference mode
     test_loss = 0
     correct = 0
     test_num = 0
+
+    images = []
+    master_preds = []
+    master_truths = []
     with torch.no_grad():   # For the inference step, gradient is not computed
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            output = model(data)
+            output, hidden_layer = model(data)
+
+            #feature_extractor = torch.nn.Sequential(*list(model.children())[:-1])
+
             test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+
+
+            #print(len(feature_vector))
+            #print(type(feature_vector))
+
+
+            #print("data:", type(data[0]))
+            #print(type(data[0][0][0]))
+
+            #print(data[0].size())
+            #print(data[0][0].size())
+            #print(type(data[0][0].data))
+
+            #a = data[0][0].cpu()
+            #b = a.numpy()
+            #print(type(b))
+            #print(np.shape(b))
+
+            #fig = plt.figure()
+            #plt.imshow(img[0][0].numpy(), cmap='gray')
+            #np.shape(data[0][0].numpy())
+
+
             correct += pred.eq(target.view_as(pred)).sum().item()
             test_num += len(data)
+
+
+            if evaluate:
+                for i in range(len(pred)):
+                    master_preds.append(pred[i][0].item())
+                    master_truths.append(target[i].item())
+
+                    if pred[i][0] == target[i]:
+                        continue
+                    else:
+                        #print("not equal")
+                        #print("pred is ", pred[i][0].item(), "and target is ", target[i].item())
+                        image = data[i][0].cpu()
+                        images.append([image.numpy(),pred[i][0].item(),target[i].item()])
+
+        if evaluate:
+
+
+            #preds = [pred[i][0].item() for i in range(len(images))]
+            #truths = [target[i].item() for i in range(len(images))]
+            CM = confusion_matrix(master_truths,master_preds)
+            CMex = CM
+            #for i in range(len(CM)):
+            #    for j in range(len(CM)):
+            #        if CM[i][j] > 0:
+            #            CMex[i][j] = log(CM[i][j])
+            #        else:
+            #            CMex[i][j] = CM[i][j]
+
+            print(CM)
+            print(CMex)
+
+            df_cm = pd.DataFrame(CM, range(10), range(10))
+            #plt.figure(figsize=(10,7))
+            fig0,ax0 = plt.subplots(1)
+            sn.set(font_scale=1)  # for label size
+            sn.heatmap(df_cm, annot=True, annot_kws={"size": 11})  # font size
+            #ax0.set_ylim(len(CMex) - 0.5, 0.5)
+            plt.xlabel("predicted")
+            plt.ylabel("ground truth")
+            plt.show()
+
+
+
+
+            fig = plt.figure()
+
+            for i in range(9):
+                sub = fig.add_subplot(3, 3, i + 1)
+                sub.imshow(images[i + 10][0], interpolation='nearest', cmap='gray')
+
+                title = "Predicted: " + str(images[i+ 10][1]) + " True: " + str(images[i+ 10][2])
+                sub.set_title(title)
+
+            kernels = model.conv1.weight.cpu().detach().clone()
+            kernels = kernels - kernels.min()
+            kernels = kernels / kernels.max()
+
+            kernels = kernels.numpy()
+            print(np.shape(kernels))
+
+            fig2 = plt.figure()
+            for i in range(8):
+
+                sub = fig2.add_subplot(2, 4, i + 1)
+                sub.imshow(kernels[i][0], interpolation='nearest', cmap='gray')
+
+                title = "Kernel #" + str(i + 1)
+                sub.set_title(title)
+
+
+        #fig, axs = plt.subplots(3, 3, constrained_layout=True)
+        #for i in range(9):
+        #    fig[i].imshow(images[i][0], interpolation='nearest', cmap='gray')
+        #    axs[i].set_title("all titles")
+
+
+
+
 
     test_loss /= test_num
 
@@ -374,7 +492,7 @@ def main():
         test_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
-        test(model, device, test_loader)
+        test(model, device, test_loader, evaluate = True)
 
         return
 
@@ -480,6 +598,7 @@ def main():
     x = []
     fig, ax = plt.subplots(1)
 
+
     if True:
         for epoch in range(1, args.epochs + 1):
             #train and test each epoch
@@ -508,7 +627,7 @@ def main():
 
 
 
-            torch.save(model.state_dict(), "mnist_model_one.pt")
+            torch.save(model.state_dict(), "mnist_model_onef.pt")
 
 
 if __name__ == '__main__':
