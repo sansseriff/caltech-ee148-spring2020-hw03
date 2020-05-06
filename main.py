@@ -379,11 +379,6 @@ def test(model, device, test_loader, evaluate = False):
                 sub = figa.add_subplot(9, 1, i + 1)
                 sub.imshow(allimages[sorted_distance_index[i]], interpolation='nearest', cmap='gray')
 
-                #title = "Predicted: " + str(images[i + 10][1]) + " True: " + str(images[i + 10][2])
-                #sub.set_title(title)
-
-
-
             X = master_hidden_layers
             y = np.array(master_truths)
             tsne = TSNE(n_components=2, random_state=0)
